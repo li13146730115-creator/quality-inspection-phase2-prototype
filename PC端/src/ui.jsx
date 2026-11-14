@@ -1,0 +1,14 @@
+import React, { useEffect, useRef } from 'react';
+import {Cross2Icon,InfoCircledIcon,CheckCircledIcon,ExclamationTriangleIcon} from '@radix-ui/react-icons';
+export function Button({children,primary=false,danger=false,small=false,className='',...props}) {return <button className={`button ${primary?'primary':''} ${danger?'danger':''} ${small?'small':''} ${className}`} {...props}>{children}</button>}
+export function Tag({children,tone='blue'}) {return <span className={`tag ${tone}`}>{children}</span>}
+export function Field({label,required=false,help,children}) {return <label className="field"><span className="field-label">{required&&<b className="required">*</b>}{label}</span><span className="field-control">{children}{help&&<small className="muted">{help}</small>}</span></label>}
+export function Notice({children,tone='info'}) {const Icon=tone==='success'?CheckCircledIcon:tone==='warning'?ExclamationTriangleIcon:InfoCircledIcon;return <div className={`notice ${tone}`}><Icon/><div>{children}</div></div>}
+export function SectionTitle({children,aside}) {return <div className="section-title"><h3>{children}</h3>{aside&&<div>{aside}</div>}</div>}
+export function Modal({title,children,onClose,footer,width=640}) {
+ const modalRef=useRef(null),closeRef=useRef(onClose);closeRef.current=onClose;
+ useEffect(()=>{const previous=document.activeElement,previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';const root=modalRef.current;const focusables=()=>[...root.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href]')];(root.querySelector('[autofocus]')||focusables()[0]||root)?.focus();const key=e=>{if(e.key==='Escape')closeRef.current();if(e.key==='Tab'){const items=focusables(),first=items[0],last=items.at(-1);if(!items.length){e.preventDefault();return}if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};document.addEventListener('keydown',key);return()=>{document.removeEventListener('keydown',key);document.body.style.overflow=previousOverflow;previous?.focus?.()}},[]);
+ return <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}><section ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className="modal" style={{maxWidth:width}}><header><h3>{title}</h3><button className="icon-button" aria-label="关闭弹窗" onClick={onClose}><Cross2Icon/></button></header><div className="modal-content">{children}</div>{footer&&<footer>{footer}</footer>}</section></div>
+}
+export function Empty({children='没有符合条件的数据'}) {return <div className="empty"><InfoCircledIcon/><p>{children}</p></div>}
+export function Pagination({count}) {return <div className="pagination"><span>共 {count} 条</span><span className="page-current">1</span><span>10 条 / 页</span></div>}
