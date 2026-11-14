@@ -12,7 +12,7 @@ run(mobile,'run','check:runtime');
 run(mobile,'exec','tsc','--','--noEmit');
 run(mobile,'exec','vite','build','--',`--base=${base}mobile/`);
 // Prefix protected runtime's root asset references in build output only.
-for(const name of readdirSync(path.join(mobile,'dist/client/assets'))){if(/\.(js|css)$/.test(name)){const file=path.join(mobile,'dist/client/assets',name);writeFileSync(file,readFileSync(file,'utf8').replaceAll('\"/assets/','\"'+base+'assets/').replaceAll("'/assets/","'"+base+'assets/'));}}
+for(const name of readdirSync(path.join(mobile,'dist/client/assets'))){if(/\.(js|css)$/.test(name)){const file=path.join(mobile,'dist/client/assets',name);writeFileSync(file,readFileSync(file,'utf8').replaceAll('\"/assets/','\"'+base+'assets/').replaceAll("'/assets/","'"+base+'assets/').replaceAll('`/assets/','`'+base+'assets/'));}}
 mkdirSync(path.join(pc,'public/mobile'),{recursive:true});
 cpSync(path.join(mobile,'dist/client'),path.join(pc,'public/mobile'),{recursive:true});
 cpSync(path.join(mobile,'public/assets'),path.join(pc,'public/assets'),{recursive:true});
