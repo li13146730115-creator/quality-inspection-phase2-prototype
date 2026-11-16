@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createInitialState} from '../src/domain.ts';
-import {createTemplateDraft,regenerateProfessionalWeights} from '../src/template-config.js';
+import {createTemplateDraft,regenerateProfessionalWeights,templateIssues,itemReferences} from '../src/template-config.js';
 
 test('new template starts empty and leaves the existing template unchanged',()=>{
  const original=createInitialState();
@@ -38,4 +38,31 @@ test('regeneration removes bonus columns and reads new ordinary items and latest
  assert.equal(generated.matrixGenerated,true);
  assert.match(generated.matrixSource,/"deduction":8/);
  assert.equal(draft.matrix[0][0],30);
+});
+
+test('draft preserves frequency and address requirements independently of professional catalog',()=>{
+ const state={...createInitialState(),nodeFrequency:'周期',frequencyCount:2,frequencyUnit:'月',addressRequired:true,professionalCatalog:['设计专业','工程专业','未参与专业']};
+ const draft=createTemplateDraft(state);
+ assert.equal(draft.frequencyCount,2);
+ assert.equal(draft.addressRequired,true);
+ draft.professionals.splice(0,1);
+ assert.ok(state.professionalCatalog.includes('设计专业'));
+ assert.equal(createTemplateDraft(state,true).nodeFrequency,'单次');
+});
+
+test('weight validation identifies the parent to edit and ignores bonus weights',()=>{
+ const draft=createTemplateDraft(createInitialState());
+ draft.dimensions[0].groups[0].weight=45;
+ draft.dimensions[4].groups[0].weight=0;
+ const issue=templateIssues(draft).find(item=>item.message.includes('二级权重'));
+ assert.equal(issue.id,'design');
+ assert.match(issue.message,/105%/);
+ assert.equal(templateIssues(draft).length,1);
+});
+
+test('deleting a parent checks all descendant problem references',()=>{
+ const state=createInitialState();
+ assert.deepEqual(itemReferences(state,'design').map(p=>p.id),['P001','P002']);
+ assert.deepEqual(itemReferences(state,'landscape').map(p=>p.id),['P001','P002']);
+ assert.equal(itemReferences(state,'design-3').length,0);
 });

@@ -72,10 +72,11 @@ export function Dictionaries({state,update,notify}) {
  const [error,setError]=useState('');
  const [pendingDelete,setPendingDelete]=useState(null);
  const title=tab==='nodeTypes'?'巡检节点类型':tab==='professionals'?'专业条线':'检查项';
- const values=tab==='items'?[]:state[tab];
+ const catalogKey=tab==='professionals'?'professionalCatalog':tab;
+ const values=tab==='items'?[]:tab==='professionals'?(state.professionalCatalog??state.professionals):state[tab];
  const statuses=state.dictionaryStatuses?.[tab]||{};
- const used=value=>tab==='nodeTypes'?(state.nodeType===value):state.people.some(person=>person.professional===value)||state.completed.includes(value)||(state.matrix[state.professionals.indexOf(value)]||[]).some(weight=>weight!==0);
- const references=value=>tab==='nodeTypes'?`模板「${state.templateName}」`:[state.people.some(p=>p.professional===value)&&'巡检人员',state.completed.includes(value)&&'已完成条线',(state.matrix[state.professionals.indexOf(value)]||[]).some(weight=>weight!==0)&&'专业权重矩阵'].filter(Boolean).join('、');
+ const used=value=>tab==='nodeTypes'?(state.nodeType===value):state.professionals.includes(value)||state.people.some(person=>person.professional===value)||state.completed.includes(value)||(state.matrix[state.professionals.indexOf(value)]||[]).some(weight=>weight!==0);
+ const references=value=>tab==='nodeTypes'?`模板「${state.templateName}」`:[state.professionals.includes(value)&&'模板参与专业',state.people.some(p=>p.professional===value)&&'巡检人员',state.completed.includes(value)&&'已完成条线',(state.matrix[state.professionals.indexOf(value)]||[]).some(weight=>weight!==0)&&'专业权重矩阵'].filter(Boolean).join('、');
  const rows=values.filter(value=>value.toLowerCase().includes(keyword.toLowerCase()));
  const openEditor=(original=null)=>{setEditor({original});setName(original||'');setError('')};
  const save=()=>{
@@ -84,24 +85,23 @@ export function Dictionaries({state,update,notify}) {
   if(values.some(value=>value===next&&value!==editor.original)){setError('名称已存在，请使用其他名称');return;}
   const original=editor.original;
   update(draft=>{
+   if(tab==='professionals')draft.professionalCatalog??=[...draft.professionals];
    if(original){
-    draft[tab]=draft[tab].map(value=>value===original?next:value);
+    draft[catalogKey]=draft[catalogKey].map(value=>value===original?next:value);
     if(tab==='nodeTypes'&&draft.nodeType===original)draft.nodeType=next;
     if(tab==='professionals'){
+     draft.professionals=draft.professionals.map(value=>value===original?next:value);
+     if(draft.matrixProfessionals)draft.matrixProfessionals=draft.matrixProfessionals.map(value=>value===original?next:value);
      draft.people=draft.people.map(person=>person.professional===original?{...person,professional:next}:person);
      draft.completed=draft.completed.map(value=>value===original?next:value);
     }
     if(draft.dictionaryStatuses?.[tab]?.[original]!==undefined){draft.dictionaryStatuses[tab][next]=draft.dictionaryStatuses[tab][original];delete draft.dictionaryStatuses[tab][original]}
    }else{
-    draft[tab].push(next);
-    if(tab==='professionals'){
-     draft.matrix.push(draft.dimensions.filter(d=>d.kind==='normal').map(()=>0));
-     draft.templateStatus='草稿';
-    }
+    draft[catalogKey].push(next);
    }
   });
   setEditor(null);
-  notify(!original&&tab==='professionals'?'专业已新增，矩阵已补充 0 权重行，请重新配置各列权重':`${title}已${original?'更新':'新增'}`);
+  notify(!original&&tab==='professionals'?'专业已新增，可在模板中选择参与并生成专业权重':`${title}已${original?'更新':'新增'}`);
  };
  const setEnabled=value=>{
   update(draft=>{draft.dictionaryStatuses??={};draft.dictionaryStatuses[tab]??={};draft.dictionaryStatuses[tab][value]=statuses[value]===false});
@@ -110,24 +110,24 @@ export function Dictionaries({state,update,notify}) {
  const remove=value=>{
   if(used(value)){notify(`无法删除：已被${references(value)}引用`);setPendingDelete(null);return;}
   update(draft=>{
-   const index=draft[tab].indexOf(value);
-   draft[tab].splice(index,1);
-   if(tab==='professionals')draft.matrix.splice(index,1);
+   if(tab==='professionals')draft.professionalCatalog??=[...draft.professionals];
+   const index=draft[catalogKey].indexOf(value);
+   draft[catalogKey].splice(index,1);
    if(draft.dictionaryStatuses?.[tab])delete draft.dictionaryStatuses[tab][value];
   });setPendingDelete(null);notify('已删除未引用的字典项');
  };
  const move=(value,offset)=>{
   const index=values.indexOf(value),next=index+offset;
   if(next<0||next>=values.length)return;
-  update(draft=>{[draft[tab][index],draft[tab][next]]=[draft[tab][next],draft[tab][index]];if(tab==='professionals')[draft.matrix[index],draft.matrix[next]]=[draft.matrix[next],draft.matrix[index]]});notify('字典顺序已更新');
+  update(draft=>{if(tab==='professionals')draft.professionalCatalog??=[...draft.professionals];[draft[catalogKey][index],draft[catalogKey][next]]=[draft[catalogKey][next],draft[catalogKey][index]]});notify('字典顺序已更新');
  };
  return <div className="config-page"><div className="config-tabs" role="tablist" aria-label="参数字典类型">{[['nodeTypes','巡检节点类型'],['professionals','专业条线'],['items','检查项']].map(([key,label])=><button key={key} role="tab" aria-selected={tab===key} className={tab===key?'active':''} onClick={()=>{setTab(key);setQuery('');setKeyword('')}}>{label}</button>)}</div>
   {tab==='items'?<section className="config-card"><SectionTitle>检查项配置</SectionTitle><Notice>新制度检查项按模板维护。请进入“巡检模板”中的“检查项与权重”配置分级名称、权重、每问题扣分及必填规则。</Notice><div className="config-dictionary-summary"><strong>{state.templateName}</strong><span>{state.dimensions.filter(d=>d.kind==='normal').length} 个一级普通项</span><span>{allLeaves(state).length} 个末级检查项</span><Tag>分值制</Tag></div><div className="config-table-wrap"><table className="config-table"><thead><tr><th>一级检查项</th><th>类型</th><th>权重</th><th>二级项数量</th><th>末级项数量</th></tr></thead><tbody>{state.dimensions.map(d=><tr key={d.id}><td>{d.name}</td><td><Tag tone={d.kind==='bonus'?'orange':'blue'}>{d.kind==='bonus'?'加分项':'普通项'}</Tag></td><td>{d.kind==='normal'?`${d.weight}%`:'不配置'}</td><td>{d.groups.length}</td><td>{d.groups.reduce((sum,g)=>sum+g.leaves.length,0)}</td></tr>)}</tbody></table></div><p className="config-review-note">历史等级制检查项仅供查看；此处不再提供旧等级标准编辑。</p></section>:<>
-   <Notice>{tab==='nodeTypes'?'节点类型为系统级字典，用于巡检模板引用。':'专业条线为系统级字典，与城市人员配置分开维护。新增专业后，请在模板专业权重矩阵重新分配权重。'} 已引用条目不可删除；停用保留现有引用。</Notice>
+   <Notice>{tab==='nodeTypes'?'节点类型为系统级字典，用于巡检模板引用。':'专业条线为系统级字典，与城市人员配置分开维护。新增专业后，可在模板中选择参与专业并生成权重。'} 已引用条目不可删除；停用保留现有引用。</Notice>
    <section className="config-card"><form className="config-toolbar" onSubmit={e=>{e.preventDefault();setKeyword(query.trim())}}><label>名称<input aria-label={`${title}查询`} value={query} onChange={e=>setQuery(e.target.value)} placeholder={`请输入${title}`}/></label><Button primary type="submit">查询</Button><Button type="button" onClick={()=>{setQuery('');setKeyword('')}}>重置</Button><Button type="button" className="config-toolbar-end" primary onClick={()=>openEditor()}>＋ 新增{title}</Button></form>
     <div className="config-table-wrap"><table className="config-table"><thead><tr><th className="config-index">序号</th><th>{title}名称</th><th>状态</th><th>引用情况</th><th className="config-operations">操作</th></tr></thead><tbody>{rows.map(value=><tr key={value}><td>{values.indexOf(value)+1}</td><td><strong className="config-normal-weight">{value}</strong></td><td><Tag tone={statuses[value]===false?'gray':'green'}>{statuses[value]===false?'已停用':'已启用'}</Tag></td><td>{used(value)?<span>{references(value)}</span>:<span className="muted">暂无业务引用</span>}</td><td><div className="config-row-actions"><button onClick={()=>openEditor(value)}>编辑</button><button onClick={()=>setEnabled(value)}>{statuses[value]===false?'启用':'停用'}</button><button disabled={values.indexOf(value)===0} onClick={()=>move(value,-1)}>上移</button><button disabled={values.indexOf(value)===values.length-1} onClick={()=>move(value,1)}>下移</button><button className="config-text-danger" onClick={()=>setPendingDelete(value)}>删除</button></div></td></tr>)}</tbody></table>{!rows.length&&<Empty/>}</div><Pagination count={rows.length}/>
    </section></>}
-  {editor&&<Modal title={`${editor.original?'编辑':'新增'}${title}`} width={520} onClose={()=>setEditor(null)} footer={<><Button onClick={()=>setEditor(null)}>取消</Button><Button primary onClick={save}>保存</Button></>}><div className="config-form"><Field label={`${title}名称`} required><input autoFocus value={name} maxLength={30} onChange={e=>{setName(e.target.value);setError('')}} placeholder="请输入名称"/>{error&&<small className="config-error" role="alert">{error}</small>}</Field>{editor.original&&used(editor.original)&&<Notice>该名称已有引用，修改后同步更新当前模板、人员与矩阵的显示名称；不删除历史数据。</Notice>}{!editor.original&&tab==='professionals'&&<Notice tone="warning">新增专业将添加至当前模板，并补充 0 权重矩阵行。模板恢复为草稿，请重新配置各列权重并完成条线巡检。</Notice>}</div></Modal>}
+  {editor&&<Modal title={`${editor.original?'编辑':'新增'}${title}`} width={520} onClose={()=>setEditor(null)} footer={<><Button onClick={()=>setEditor(null)}>取消</Button><Button primary onClick={save}>保存</Button></>}><div className="config-form"><Field label={`${title}名称`} required><input autoFocus value={name} maxLength={30} onChange={e=>{setName(e.target.value);setError('')}} placeholder="请输入名称"/>{error&&<small className="config-error" role="alert">{error}</small>}</Field>{editor.original&&used(editor.original)&&<Notice>该名称已有引用，修改后同步更新当前模板、人员与矩阵的显示名称；不删除历史数据。</Notice>}{!editor.original&&tab==='professionals'&&<Notice tone="warning">新增专业仅加入系统字典。请在需要的模板中勾选该专业，并重新生成专业权重。</Notice>}</div></Modal>}
   {pendingDelete&&<Modal title={used(pendingDelete)?'字典项已被引用':'删除字典项'} width={480} onClose={()=>setPendingDelete(null)} footer={used(pendingDelete)?<Button primary onClick={()=>setPendingDelete(null)}>知道了</Button>:<><Button onClick={()=>setPendingDelete(null)}>取消</Button><Button danger onClick={()=>remove(pendingDelete)}>确认删除</Button></>}><p>「{pendingDelete}」{used(pendingDelete)?`已被${references(pendingDelete)}引用，无法删除。可停用该字典项，保留现有引用。`:'没有业务引用，确认删除该条目？'}</p></Modal>}
  </div>;
 }

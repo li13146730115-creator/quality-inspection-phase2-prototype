@@ -6,7 +6,7 @@ export type Problem = {id:string;leafId:string;description:string;images:string[
 export type Person = {id:string;name:string;professional:string;role:'评分人'|'拍照人';submitted:boolean};
 export type Reminder = {id:string;name:string;scopeType:'城市公司'|'项目';scope:string[];days:number;recipients:string[];enabled:boolean};
 export type InspectionState = {
- templateName:string;nodeType:string;professionals:string[];dimensions:Dimension[];matrix:number[][];
+ templateName:string;nodeType:string;professionalCatalog?:string[];nodeFrequency?:string;frequencyCount?:number|string;frequencyUnit?:string;addressRequired?:boolean;professionals:string[];dimensions:Dimension[];matrix:number[][];
  problems:Problem[];people:Person[];completed:string[];review:number|null;reviewNote:string;reviewSavedAt:string;
  grades:GradeRule[];authorizedProjects:string[];reminders:Reminder[];nodeTypes:string[];templateStatus:string;
 };
